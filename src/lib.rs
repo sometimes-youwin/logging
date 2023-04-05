@@ -114,7 +114,7 @@ impl LoggingBuilder {
             .level(LevelFilter::Debug)
             .chain(fern::log_file(log_file_path)?);
 
-        let mut root = Dispatch::new();
+        let mut root = Dispatch::new().level(self.global_level);
         for (mod_name, level) in self.level_for.iter() {
             root = root.level_for(mod_name.clone(), level.clone());
         }
@@ -123,62 +123,6 @@ impl LoggingBuilder {
 
         Ok(())
     }
-}
-
-/// Initialize logging.
-pub fn init<S: AsRef<str>>(qualifier: S, organization: S, app_name: S) -> anyhow::Result<()> {
-    println!("Initializing logging");
-
-    let term = Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{}] {} - {}",
-                record.level(),
-                record.target(),
-                message
-            ))
-        })
-        .level(LevelFilter::Debug)
-        .chain(std::io::stdout());
-
-    let project_dir = if let Some(d) =
-        ProjectDirs::from(qualifier.as_ref(), organization.as_ref(), app_name.as_ref())
-    {
-        d
-    } else {
-        anyhow::bail!("Unable to get project directories");
-    };
-    let mut log_dir = project_dir.cache_dir().to_path_buf();
-    log_dir.push("logs");
-
-    rotate_logs(&log_dir)?;
-
-    let time = Local::now();
-
-    let mut log_file_path = log_dir;
-    log_file_path.push(format!("{}.log", time.format(CHRONO_FORMAT)));
-
-    let file = Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{}] {} {} - {}",
-                record.level(),
-                Local::now().naive_local().format(CHRONO_FORMAT),
-                record.target(),
-                message
-            ))
-        })
-        .level(LevelFilter::Debug)
-        .chain(fern::log_file(log_file_path)?);
-
-    Dispatch::new()
-        .level_for("wgpu_core", LevelFilter::Error)
-        .level_for("wgpu_hal", LevelFilter::Error)
-        .chain(term)
-        .chain(file)
-        .apply()?;
-
-    Ok(())
 }
 
 /// Rotates all logs found in the `log_dir`.
